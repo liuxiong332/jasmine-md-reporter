@@ -1,0 +1,20 @@
+{
+  "name": "jasmine-md-reporter",
+  "version": "0.1.0",
+  "description": "The markdown reporter for jasmine",
+  "main": "lib/reporter.js",
+  "scripts": {
+    "test": "gulp test"
+  },
+  "keywords": [
+    "jasmine",
+    "markdown",
+    "reporter"
+  ],
+  "author": "liuxiong",
+  "license": "MIT",
+  "devDependencies": {
+    "gulp": "^3.9.0",
+    "gulp-jasmine": "^2.0.1"
+  }
+}
