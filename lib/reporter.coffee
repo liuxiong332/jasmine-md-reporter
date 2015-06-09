@@ -28,114 +28,139 @@ defaultStackFilter = (stack) ->
     stackLine.indexOf(jasmineCorePath) is -1
   .join('\n')
 
-specFailureDetails = (result, failedSpecNumber) ->
-  printNewline()
-  print(failedSpecNumber + ') ')
-  print(result.fullName)
-
-  for i in [0...result.failedExpectations.length]
-    failedExpectation = result.failedExpectations[i]
-    printNewline()
-    print(indent('Message:', 2))
-    printNewline()
-    print(colored('red', indent(failedExpectation.message, 4)))
-    printNewline()
-    print(indent('Stack:', 2))
-    printNewline()
-    print(indent(stackFilter(failedExpectation.stack), 4))
-
-  printNewline()
-
-suiteFailureDetails = (result) ->
-  for i in [0...result.failedExpectations.length]
-    printNewline()
-    print(colored('red', 'An error was thrown in an afterAll'))
-    printNewline()
-    print(colored('red', 'AfterAll ' + result.failedExpectations[i].message))
-  printNewline()
-
-pendingSpecDetails = (result, pendingSpecNumber) ->
-  printNewline()
-  printNewline()
-  print(pendingSpecNumber + ') ')
-  print(result.fullName)
-  printNewline()
-  pendingReason = "No reason given"
-  if result.pendingReason && result.pendingReason isnt ''
-    pendingReason = result.pendingReason
-
-  print(indent(colored('yellow', pendingReason), 2))
-  printNewline()
+extend = (target, obj) ->
+  for own attrKey, val of obj
+    target[attrKey] = val
+  target
 
 class ConsoleReporter
-  constructor: (options) ->
-    @print = options.print
+  constructor: (options={}) ->
+    @print = options.print || (str) -> console.log(str)
     @jasmineCorePath = options.jasmineCorePath
 
-    @failedSpecs = []
-    @pendingSpecs = []
-    @failedSuites = []
+    @specCount = 0
+    @failedSpecCount = 0
+    @pendingSpecCount = 0
+    @passedSpecCount = 0
+    @disabledSpecCount = 0
+
+    @_suites = {}
+    @_specs = {}
+
+    @topLevelSuites = []
     @stackFilter = options.stackFilter || defaultStackFilter
 
     @onComplete = options.onComplete
 
   jasmineStarted: ({totalSpecs}) ->
-    @specCount = 0
-    print('# Started')
-    printNewline()
+    console.log('hello world')
 
   jasmineDone: ->
+    @print('## Result')
+    res = "#{@specCount} specs, #{@passedSpecCount} passed specs, " +
+      "#{@failedSpecCount} failures, #{@pendingSpecCount} pending specs"
+    @print(res)
+
+    unless @failedSpecCount is 0
+      @print('## Failures')
+      @walkTree(suite, 0) for suite in @topLevelSuites
+
+    @onComplete?(@failedSpecCount is 0)
+
+  printDepth: (depth, str) ->
+    space = ('  ' for i in [0...depth]).join()
+    @print("#{space}#{str}")
+
+  specFailureDetails: (result, failedSpecNumber) ->
+    return
     printNewline()
-    printNewline()
-    if @failedSpecs.length > 0
-      print('Failures:')
+    print(failedSpecNumber + ') ')
+    print(result.fullName)
 
-    for i in [0...failedSpecs.length]
-      specFailureDetails(failedSpecs[i], i + 1)
-
-    print("Pending:") if pendingSpecs.length > 0
-
-    for i in [0...pendingSpecs.length]
-      pendingSpecDetails(pendingSpecs[i], i + 1)
-
-    if specCount > 0
+    for i in [0...result.failedExpectations.length]
+      failedExpectation = result.failedExpectations[i]
       printNewline()
+      print(indent('Message:', 2))
+      printNewline()
+      print(colored('red', indent(failedExpectation.message, 4)))
+      printNewline()
+      print(indent('Stack:', 2))
+      printNewline()
+      print(indent(stackFilter(failedExpectation.stack), 4))
 
-      specCounts = specCount + ' ' + plural('spec', specCount) + ', ' +
-        failureCount + ' ' + plural('failure', failureCount)
+    printNewline()
 
-      if pendingSpecs.length
-        specCounts += ', ' + pendingSpecs.length + ' pending ' + plural('spec', pendingSpecs.length);
+  suiteFailureDetails: (result) ->
+    return
+    for i in [0...result.failedExpectations.length]
+      printNewline()
+      print(colored('red', 'An error was thrown in an afterAll'))
+      printNewline()
+      print(colored('red', 'AfterAll ' + result.failedExpectations[i].message))
+    printNewline()
 
-      print(specCounts)
+  walkTree: (suite, depth) ->
+    return unless suite._status is 'failed'
+    unless suite.children?
+      @specFailureDetails(suite)
     else
-      print('No specs found')
+      @printDepth(depth, "* #{suite.description}\n")
+      @walkTree(child, depth + 1) for child in suite.children
+      @suiteFailureDetails(suite)
 
-    printNewline()
-    seconds = timer.elapsed() / 1000
-    print('Finished in ' + seconds + ' ' + plural('second', seconds))
-    printNewline()
-
-    for i in [0...failedSuites.length]
-      suiteFailureDetails(failedSuites[i])
-
-    onComplete(failureCount is 0)
+  specStarted: (result) ->
+    console.log('specStarted: ', result)
+    return
+    spec = @getSpec(result)
+    spec._suite = @currentSuite
+    @currentSuite.children.push spec
 
   specDone: (result) ->
+    console.log('specDone: ', result)
+    spec = @getSpec(result)
+    if spec.status is 'failed'
+      spec._status = spec._suite._status = 'failed'
     @specCount++
 
     switch result.status
       when 'pending'
-        @pendingSpecs.push(result)
-        @print('-')
+        @pendingSpecCount++
+        @print('P')
       when 'passed'
+        @passedSpecCount++
         @print('.')
+      when 'disabled'
+        @disabledSpecCount++
+        @print('D')
       when 'failed'
-        @failedSpecs.push(result)
+        @failedSpecCount++
         @print('F')
 
+  suiteStarted: (result) ->
+    console.log 'suiteStarted: '
+    suite = @getSuite(result)
+    console.log suite
+    suite.children = []
+    if @currentSuite
+      @currentSuite.children.push(suite)
+    else
+      @topLevelSuites.push(suite)
+    suite._parent = @currentSuite
+    @currentSuite = suite
+
   suiteDone: (result) ->
-    if result.failedExpectations?.length > 0
-      @failedSuites.push(result)
+    console.log 'suiteDone: ', result
+    suite = @getSuite(result)
+    @currentSuite = suite._parent
+    if suite.status is 'failed'
+      suite._status = 'failed'
+    if suite._status is 'failed' and @currentSuite
+      @currentSuite._status = 'failed'
+
+  getSpec: (spec) ->
+    @_specs[spec.id] = extend(@_specs[spec.id] || {}, spec)
+
+  getSuite: (suite) ->
+    @_suites[suite.id] = extend(@_suites[suite.id] or {}, suite)
 
 module.exports = exports = ConsoleReporter
