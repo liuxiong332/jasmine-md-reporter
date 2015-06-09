@@ -2,9 +2,6 @@ noopTimer =
   start: ->
   elapsed: -> 0
 
-printNewline = ->
-  print('\n')
-
 colored = (color, str) ->
   if showColors then (ansi[color] + str + ansi.none) else str
 
@@ -23,11 +20,6 @@ indent = (str, spaces) ->
     newArr.push(repeat(' ', spaces).join('') + lines[i])
   newArr.join('\n')
 
-defaultStackFilter = (stack) ->
-  stack.split('\n').filter (stackLine) ->
-    stackLine.indexOf(jasmineCorePath) is -1
-  .join('\n')
-
 extend = (target, obj) ->
   for own attrKey, val of obj
     target[attrKey] = val
@@ -35,8 +27,7 @@ extend = (target, obj) ->
 
 class ConsoleReporter
   constructor: (options={}) ->
-    @print = options.print || (str) -> console.log(str)
-    @jasmineCorePath = options.jasmineCorePath
+    @print = options.print || (str) -> process.stdout.write(str)
 
     @specCount = 0
     @failedSpecCount = 0
@@ -48,75 +39,78 @@ class ConsoleReporter
     @_specs = {}
 
     @topLevelSuites = []
-    @stackFilter = options.stackFilter || defaultStackFilter
+    @stackFilter = options.stackFilter ||
+      @defaultStackFilter.bind(this)
 
     @onComplete = options.onComplete
 
   jasmineStarted: ({totalSpecs}) ->
-    console.log('hello world')
 
   jasmineDone: ->
-    @print('## Result')
+    @print('\n')
+    @print('## Result\n')
     res = "#{@specCount} specs, #{@passedSpecCount} passed specs, " +
-      "#{@failedSpecCount} failures, #{@pendingSpecCount} pending specs"
+      "#{@failedSpecCount} failures, #{@pendingSpecCount} pending specs\n"
     @print(res)
 
     unless @failedSpecCount is 0
-      @print('## Failures')
+      @print('## Failures\n')
       @walkTree(suite, 0) for suite in @topLevelSuites
 
     @onComplete?(@failedSpecCount is 0)
 
+  defaultStackFilter: (stack) ->
+    return stack unless @jasmineCorePath
+    stack.split('\n').filter (stackLine) =>
+      stackLine.indexOf(@jasmineCorePath) is -1
+    .join('\n')
+
   printDepth: (depth, str) ->
-    space = ('  ' for i in [0...depth]).join()
-    @print("#{space}#{str}")
+    space = ('  ' for i in [0...depth]).join('')
+    lines = str.split('\n')
+    unless lines[lines.length - 1]
+      endWithNewLine = true
+      lines.pop()
+    str = ("#{space}#{line}" for line in lines).join('\n')
+    str += '\n' if endWithNewLine
+    @print str
 
-  specFailureDetails: (result, failedSpecNumber) ->
-    return
-    printNewline()
-    print(failedSpecNumber + ') ')
-    print(result.fullName)
+  printStack: (depth, stack) ->
+    space = ('  ' for i in [0...depth]).join('')
+    lines = stack.split('\n')
+    lines[0] = "*Stack*: `#{lines[0]}`"
+    lines.splice(1, 0, '```js')
+    lines.push('```\n')
+    @print ("#{space}#{line}" for line in lines).join('\n')
 
-    for i in [0...result.failedExpectations.length]
-      failedExpectation = result.failedExpectations[i]
-      printNewline()
-      print(indent('Message:', 2))
-      printNewline()
-      print(colored('red', indent(failedExpectation.message, 4)))
-      printNewline()
-      print(indent('Stack:', 2))
-      printNewline()
-      print(indent(stackFilter(failedExpectation.stack), 4))
+  specFailureDetails: (result, depth) ->
+    @printDepth(depth, "* **#{result.description}**\n")
 
-    printNewline()
+    for failedExpectation in result.failedExpectations
+      @printDepth(depth + 1, "*Message*: `#{failedExpectation.message}`\n")
+      @printStack(depth + 1, @stackFilter(failedExpectation.stack))
 
-  suiteFailureDetails: (result) ->
-    return
-    for i in [0...result.failedExpectations.length]
-      printNewline()
-      print(colored('red', 'An error was thrown in an afterAll'))
-      printNewline()
-      print(colored('red', 'AfterAll ' + result.failedExpectations[i].message))
-    printNewline()
+  suiteFailureDetails: (result, depth) ->
+    for failedExpectation in result.failedExpectations
+      @printDepth(depth, '*An error was thrown in an afterAll*')
+      @printDepth(depth, '*AfterAll*: ' + failedExpectation.message)
+      @printStack(depth, @stackFilter(failedExpectation.stack))
 
   walkTree: (suite, depth) ->
     return unless suite._status is 'failed'
     unless suite.children?
-      @specFailureDetails(suite)
+      @specFailureDetails(suite, depth)
     else
-      @printDepth(depth, "* #{suite.description}\n")
+      @printDepth(depth, "* **#{suite.description}**\n")
       @walkTree(child, depth + 1) for child in suite.children
-      @suiteFailureDetails(suite)
+      @suiteFailureDetails(suite, depth + 1)
 
   specStarted: (result) ->
-    console.log('specStarted: ', result)
-    return
     spec = @getSpec(result)
     spec._suite = @currentSuite
     @currentSuite.children.push spec
 
   specDone: (result) ->
-    console.log('specDone: ', result)
     spec = @getSpec(result)
     if spec.status is 'failed'
       spec._status = spec._suite._status = 'failed'
@@ -137,9 +131,7 @@ class ConsoleReporter
         @print('F')
 
   suiteStarted: (result) ->
-    console.log 'suiteStarted: '
     suite = @getSuite(result)
-    console.log suite
     suite.children = []
     if @currentSuite
       @currentSuite.children.push(suite)
@@ -149,7 +141,6 @@ class ConsoleReporter
     @currentSuite = suite
 
   suiteDone: (result) ->
-    console.log 'suiteDone: ', result
     suite = @getSuite(result)
     @currentSuite = suite._parent
     if suite.status is 'failed'

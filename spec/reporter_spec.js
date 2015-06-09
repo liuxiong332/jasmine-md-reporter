@@ -5,8 +5,8 @@ describe('Hello', function() {
   });
 
   it('buildes the suites_ collection', function() {
-    expect('Hello').toEqual('Hello');
-    expect('world').toEqual('world');
+    expect('Hello').toEqual('Hello2');
+    expect('world').toEqual('world2');
   });
 
   // xdescribe('not able describe', function() {
@@ -17,7 +17,7 @@ describe('Hello', function() {
   // });
 
   xit('good Hello', function() {
-    expect('dd').toEqual('dd');
+    expect('dd').toEqual('dd2');
   });
 
   // fit('focus good Hello', function() {
