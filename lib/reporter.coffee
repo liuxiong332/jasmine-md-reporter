@@ -1,3 +1,6 @@
+minimatch = require('minimatch')
+path = require('path')
+
 noopTimer =
   start: ->
   elapsed: -> 0
@@ -29,6 +32,13 @@ class ConsoleReporter
   constructor: (options={}) ->
     @print = options.print || (str) -> process.stdout.write(str)
 
+    @basePath = options.basePath ? process.cwd()
+    @ignoreStackPatterns = options.ignoreStackPatterns ? []
+    unless Array.isArray(@ignoreStackPatterns)
+      @ignoreStackPatterns = [@ignoreStackPatterns]
+    @ignoreStackPatterns = @ignoreStackPatterns.map (pattern) =>
+      path.resolve(@basePath, pattern)
+
     @specCount = 0
     @failedSpecCount = 0
     @pendingSpecCount = 0
@@ -45,12 +55,13 @@ class ConsoleReporter
     @onComplete = options.onComplete
 
   jasmineStarted: ({totalSpecs}) ->
+    @print('## Start\n')
 
   jasmineDone: ->
     @print('\n')
     @print('## Result\n')
-    res = "#{@specCount} specs, #{@passedSpecCount} passed specs, " +
-      "#{@failedSpecCount} failures, #{@pendingSpecCount} pending specs\n"
+    res = "**`#{@specCount}` specs**, **`#{@passedSpecCount}` passed specs**, " +
+      "**`#{@failedSpecCount}` failures**, **`#{@pendingSpecCount}` pending specs**\n"
     @print(res)
 
     unless @failedSpecCount is 0
@@ -59,11 +70,34 @@ class ConsoleReporter
 
     @onComplete?(@failedSpecCount is 0)
 
+  pathIsIgnore: (path) ->
+    for pattern in @ignoreStackPatterns
+      if minimatch(path, pattern)
+        return true
+    false
+
+  if process.platform is 'win32'
+    PATH_REG = /\b(\w:\\)?([\w\.-]+\\)*[\w\.-]+(?=:\d+:\d+)/
+  else
+    PATH_REG = /\b(\/)?([\w\.-]+\/)*[\w\.-]+(?=:\d+:\d+)/
+
+  NODE_MODULE_REG = /^\w+.js$/
   defaultStackFilter: (stack) ->
-    return stack unless @jasmineCorePath
-    stack.split('\n').filter (stackLine) =>
-      stackLine.indexOf(@jasmineCorePath) is -1
-    .join('\n')
+    lines = stack.split('\n')
+    resLines = []
+    for stackLine in lines
+      console.log stackLine
+      unless matchRes = PATH_REG.exec(stackLine)
+        resLines.push stackLine
+      else
+        file = matchRes[0]
+        console.log file
+        # reject nodejs module and ignore path
+        if not NODE_MODULE_REG.test(file) and not @pathIsIgnore(file)
+          # replace the abslute path with the relative path
+          # console.log path.relative(@basePath, file)
+          resLines.push stackLine.replace(file, path.relative(@basePath, file))
+    resLines.join('\n')
 
   printDepth: (depth, str) ->
     space = ('  ' for i in [0...depth]).join('')
@@ -87,8 +121,8 @@ class ConsoleReporter
     @printDepth(depth, "* **#{result.description}**\n")
 
     for failedExpectation in result.failedExpectations
-      @printDepth(depth + 1, "*Message*: `#{failedExpectation.message}`\n")
-      @printStack(depth + 1, @stackFilter(failedExpectation.stack))
+      @printDepth(depth + 1, "* *Message*: `#{failedExpectation.message}`\n")
+      @printStack(depth + 2, @stackFilter(failedExpectation.stack))
 
   suiteFailureDetails: (result, depth) ->
     for failedExpectation in result.failedExpectations

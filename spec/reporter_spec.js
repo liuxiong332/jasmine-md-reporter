@@ -16,7 +16,7 @@ describe('Hello', function() {
   //   });
   // });
 
-  xit('good Hello', function() {
+  it('good Hello', function() {
     expect('dd').toEqual('dd2');
   });
 
@@ -24,9 +24,9 @@ describe('Hello', function() {
   //   expect('dd').toEqual('dd');
   // });
 
-  xdescribe('just for fun', function() {
+  describe('just for fun', function() {
     it('fun in fun', function() {
-      expect('hello').toEqual('hello');
+      expect('hellos').toEqual('hello');
     });
 
     xit('focus in fun', function() {
@@ -35,7 +35,7 @@ describe('Hello', function() {
 
     describe('ddd', function() {
       it('mmm', function() {
-        expect('hello').toEqual('hello');
+        expect('hellos').toEqual('hello');
       });
     });
   });
