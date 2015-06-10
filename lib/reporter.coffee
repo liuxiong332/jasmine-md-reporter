@@ -1,28 +1,6 @@
 minimatch = require('minimatch')
 path = require('path')
 
-noopTimer =
-  start: ->
-  elapsed: -> 0
-
-colored = (color, str) ->
-  if showColors then (ansi[color] + str + ansi.none) else str
-
-plural = (str, count) ->
-  if count == 1 then str else str + 's'
-
-repeat = (thing, times) ->
-  arr = []
-  arr.push(thing) for i in [0...times]
-  arr
-
-indent = (str, spaces) ->
-  lines = (str || '').split('\n')
-  newArr = []
-  for i in [0...lines.length]
-    newArr.push(repeat(' ', spaces).join('') + lines[i])
-  newArr.join('\n')
-
 extend = (target, obj) ->
   for own attrKey, val of obj
     target[attrKey] = val
@@ -49,8 +27,7 @@ class ConsoleReporter
     @_specs = {}
 
     @topLevelSuites = []
-    @stackFilter = options.stackFilter ||
-      @defaultStackFilter.bind(this)
+    @stackFilter = options.stackFilter || @defaultStackFilter.bind(this)
 
     @onComplete = options.onComplete
 
