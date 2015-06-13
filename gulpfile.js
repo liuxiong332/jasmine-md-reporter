@@ -2,7 +2,9 @@
 
 var gulp   = require('gulp');
 var jasmine = require('gulp-jasmine');
-var TerminalReporter = require('./lib/terminal-reporter').TerminalReporter;
+var coffee = require('gulp-coffee');
+var gutil = require('gulp-util');
+var del = require('del');
 
 require('coffee-script/register');
 
@@ -49,4 +51,14 @@ gulp.task('exercies', function() {
     }));
 });
 
-gulp.task('default', ['test']);
+gulp.task('clean', function(cb) {
+  del(['dist/'], cb);
+});
+
+gulp.task('dist', ['clean'], function () {
+  return gulp.src('lib/*.coffee', {base: 'lib'})
+    .pipe(coffee({bare: true})).on('error', gutil.log)
+    .pipe(gulp.dest('./dist'));
+});
+
+gulp.task('default', ['dist']);

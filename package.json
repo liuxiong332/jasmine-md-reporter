@@ -2,7 +2,7 @@
   "name": "jasmine-md-reporter",
   "version": "0.1.0",
   "description": "The markdown reporter for jasmine",
-  "main": "lib/reporter.js",
+  "main": "dist/reporter.js",
   "scripts": {
     "test": "gulp test"
   },
@@ -11,12 +11,22 @@
     "markdown",
     "reporter"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/liuxiong332/node-http-ext"
+  },
+  "files": [
+    "dist/*.js"
+  ],
   "author": "liuxiong",
   "license": "MIT",
   "devDependencies": {
     "coffee-script": "^1.9.3",
+    "del": "^1.2.0",
     "gulp": "^3.9.0",
-    "gulp-jasmine": "^2.0.1"
+    "gulp-coffee": "^2.3.1",
+    "gulp-jasmine": "^2.0.1",
+    "gulp-util": "^3.0.5"
   },
   "dependencies": {
     "minimatch": "^2.0.8"
